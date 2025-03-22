@@ -1,103 +1,302 @@
-import Image from "next/image";
+﻿"use client";
+
+import { useRef, useEffect, useState, useContext, useLayoutEffect } from 'react';
+import { gsap } from 'gsap';
+import ThreadAnimation, { Section } from '../components/ThreadAnimation';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
+import AccessibilityControls from '../components/AccessibilityControls';
+import { AnimationContext } from '../context/AnimationContext';
+// import ScrollTrigger from 'gsap/ScrollTrigger';
+import Script from 'next/script';
+import { setupScrollAnimations } from '../utils/intersection';
+import Contact from '../components/Contact';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const { animationsEnabled, config, isReducedMotion } = useContext(AnimationContext);
+  
+  // Create refs for sections that will be revealed as thread unwinds
+  const heroRef = useRef<HTMLElement>(null);
+  const aboutRef = useRef<HTMLElement>(null);
+  const servicesRef = useRef<HTMLElement>(null);
+  const testimonialRef = useRef<HTMLElement>(null);
+  const contactRef = useRef<HTMLElement>(null);
+  
+  // Create state to hold sections with element references
+  const [sections, setSections] = useState<Section[]>([]);
+  
+  // Background state for gradual color change
+  const [scrollProgress, setScrollProgress] = useState(0);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Update sections when refs are available
+  useEffect(() => {
+    const updateSections = () => {
+      if (heroRef.current && aboutRef.current && servicesRef.current && 
+          testimonialRef.current && contactRef.current) {
+        // Initialize sections with visibility set to true
+        const newSections = [
+          { element: heroRef.current, id: 'hero' },
+          { element: aboutRef.current, id: 'about' },
+          { element: servicesRef.current, id: 'services' },
+          { element: testimonialRef.current, id: 'testimonials' },
+          { element: contactRef.current, id: 'contact' },
+        ];
+
+        // Set initial visibility and position
+        newSections.forEach(section => {
+          if (section.element) {
+            gsap.set(section.element, {
+              opacity: 1,
+              y: 0,
+              visibility: 'visible'
+            });
+          }
+        });
+
+        setSections(newSections);
+      }
+    };
+
+    // Use MutationObserver to detect when refs are available
+    const observer = new MutationObserver(updateSections);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Initial check
+    updateSections();
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Track scroll for background effect
+  useEffect(() => {
+    if (!animationsEnabled) return;
+    
+    const handleScroll = () => {
+      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = window.scrollY / totalHeight;
+      setScrollProgress(progress);
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [animationsEnabled]);
+  
+  // Initialize sections with opacity 1 by default
+  useLayoutEffect(() => {
+    const elements = [
+      heroRef.current, 
+      aboutRef.current, 
+      servicesRef.current, 
+      testimonialRef.current, 
+      contactRef.current
+    ].filter(Boolean);
+    
+    if (elements.length > 0) {
+      gsap.set(elements, { 
+        opacity: 1, 
+        y: 0,
+        visibility: 'visible'
+      });
+    }
+  }, []);
+  
+  // Use animation config color intensity for background
+  const colorIntensity = config?.colorIntensity || 0.8;
+  const saturation = 40 + Math.round(colorIntensity * 20); // 40-60% saturation based on config
+  
+  // Calculate background gradient based on scroll
+  const gradientStyle = {
+    background: `linear-gradient(135deg, 
+      hsl(${210 + scrollProgress * 15}, ${saturation}%, 97%) 0%, 
+      hsl(${230 + scrollProgress * 15}, ${Math.round(saturation * 0.7)}%, 95%) 100%)`,
+    minHeight: '100vh',
+    overflow: 'visible'
+  };
+  
+  // Add animation classes based on reduced motion preference
+  const animationClass = isReducedMotion ? 'animate-fade' : 'animate-on-scroll';
+
+  // Initialize animations on elements with animate-on-scroll class
+  useEffect(() => {
+    if (isReducedMotion) return;
+    
+    // Setup animations when component mounts
+    const cleanup = setupScrollAnimations();
+    
+    // Clean up observer when component unmounts
+    return cleanup;
+  }, [isReducedMotion]);
+
+  return (
+    <>
+      {/* Structured data for SEO */}
+      <Script
+        id="structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'ProfessionalService',
+            name: 'Feelings Unfolded with Sakina',
+            description: 'Professional counseling and emotional wellness services provided by Sakina.',
+            url: 'https://feelingsunfolded.com',
+            telephone: '+918275052015',
+            address: {
+              '@type': 'PostalAddress',
+              addressCountry: 'IN'
+            },
+            sameAs: [
+              'https://instagram.com/feelings_unfolded',
+              'https://linkedin.com/in/sakina-counselor'
+            ],
+            priceRange: '$$',
+            openingHours: 'Mo-Fr 09:00-17:00',
+            serviceType: [
+              'Counseling',
+              'Emotional Wellness',
+              'Mental Health',
+              'Therapy'
+            ]
+          })
+        }}
+      />
+    
+      <div className="min-h-screen overflow-visible" style={gradientStyle}>
+        <Navbar />
+        
+        {/* Accessibility Controls */}
+        <div className="fixed bottom-6 right-6 z-50">
+          <AccessibilityControls />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        
+        <main className="relative overflow-visible">
+          {/* Thread animation positioned absolutely */}
+          <div className="fixed inset-0 w-full h-full z-0 pointer-events-none overflow-visible">
+            <ThreadAnimation sections={sections} />
+          </div>
+          
+          {/* Content sections with higher z-index */}
+          <section 
+            id="hero" 
+            ref={heroRef} 
+            className="min-h-screen flex items-center justify-center relative z-10 px-6 md:px-12 opacity-100"
+          >
+            <div className="text-center">
+              <h1 className="text-4xl md:text-6xl font-bold mb-6">
+                <span className="bg-gradient-to-r from-[#2a9d8f] to-[#264653] bg-clip-text text-transparent">
+                  Feelings Unfolded
+                </span>
+                <span className="block text-2xl md:text-3xl font-medium mt-2 text-[#264653]/80">
+                  with Sakina
+                </span>
+              </h1>
+              <p className="text-xl md:text-2xl text-gray-600">A journey through emotional wellness</p>
+              
+              <div className="mt-8">
+                <a 
+                  href="#contact"
+                  className="px-6 py-3 bg-[#2a9d8f] hover:bg-[#264653] text-white rounded-lg shadow-md transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#2a9d8f] focus:ring-offset-2"
+                  aria-label="Get started with counseling services"
+                >
+                  Get Started
+                </a>
+              </div>
+            </div>
+          </section>
+
+          <section 
+            id="about" 
+            ref={aboutRef} 
+            className="min-h-screen flex items-center relative z-10 px-6 md:px-12 bg-white/30 backdrop-blur-sm"
+          >
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-3xl md:text-5xl font-bold mb-8 text-[#264653]">About Me</h2>
+              <p className={`text-lg md:text-xl text-gray-700 mb-6 ${animationClass}`}>
+                With years of experience in emotional wellness and counseling, I help individuals navigate their emotional journey with compassion and understanding.
+              </p>
+              <p className={`text-lg md:text-xl text-gray-700 ${animationClass}`}>
+                My approach combines traditional therapeutic methods with modern mindfulness practices, creating a unique path to emotional well-being.
+              </p>
+            </div>
+          </section>
+
+          <section 
+            id="services" 
+            ref={servicesRef} 
+            className="min-h-screen flex items-center relative z-10 px-6 md:px-12"
+          >
+            <div className="max-w-6xl mx-auto">
+              <h2 className="text-3xl md:text-5xl font-bold mb-12 text-center text-[#264653]">Services</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className={`p-6 rounded-lg shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white/90 transition ${animationClass}`}>
+                  <h3 className="text-xl font-bold mb-4 text-[#2a9d8f]">Individual Counseling</h3>
+                  <p className="text-gray-600">One-on-one sessions focused on your personal growth and emotional well-being.</p>
+                </div>
+                <div className={`p-6 rounded-lg shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white/90 transition ${animationClass}`}>
+                  <h3 className="text-xl font-bold mb-4 text-[#2a9d8f]">Group Therapy</h3>
+                  <p className="text-gray-600">Collaborative sessions where shared experiences lead to collective healing.</p>
+                </div>
+                <div className={`p-6 rounded-lg shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white/90 transition ${animationClass}`}>
+                  <h3 className="text-xl font-bold mb-4 text-[#2a9d8f]">Mindfulness Workshops</h3>
+                  <p className="text-gray-600">Learn practical techniques for emotional awareness and stress management.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section 
+            id="testimonials" 
+            ref={testimonialRef} 
+            className="min-h-screen flex items-center relative z-10 px-6 md:px-12"
+          >
+            <div className="max-w-6xl mx-auto">
+              <h2 className="text-3xl md:text-5xl font-bold mb-12 text-center text-[#264653]">Testimonials</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className={`p-6 rounded-lg shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white/90 transition ${animationClass}`}>
+                  <div className="flex items-center mb-4">
+                    <img 
+                      src="https://randomuser.me/api/portraits/women/32.jpg" 
+                      alt="Sarah M." 
+                      className="w-12 h-12 rounded-full mr-4"
+                      loading="lazy"
+                    />
+                    <div>
+                      <h3 className="font-semibold text-[#264653]">Sarah M.</h3>
+                      <p className="text-gray-600">Client for 6 months</p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mb-4">&ldquo;Working with Sakina has been transformative. Her approach to emotional wellness opened new perspectives for me.&rdquo;</p>
+                </div>
+                <div className={`p-6 rounded-lg shadow-lg bg-white/80 backdrop-blur-sm hover:bg-white/90 transition ${animationClass}`}>
+                  <div className="flex items-center mb-4">
+                    <img 
+                      src="https://randomuser.me/api/portraits/men/54.jpg" 
+                      alt="James R." 
+                      className="w-12 h-12 rounded-full mr-4"
+                      loading="lazy"
+                    />
+                    <div>
+                      <h3 className="font-semibold text-[#264653]">James R.</h3>
+                      <p className="text-gray-600">Workshop participant</p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mb-4">&ldquo;The mindfulness techniques I learned have become an essential part of my daily routine. Thank you, Sakina!&rdquo;</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section 
+            id="contact" 
+            ref={contactRef} 
+            className="min-h-screen flex items-center relative z-10 px-6 md:px-12"
+          >
+            <Contact />
+          </section>
+        </main>
+        
+        <Footer />
+      </div>
+    </>
   );
 }
